@@ -149,7 +149,7 @@ export default function App() {
             setMessage({ text: 'Please select a screenshot file first.', type: 'error' });
             return;
         }
-        if (!userId) {
+        if (!auth.currentUser) {
             setMessage({ text: 'Cannot analyze: User not authenticated.', type: 'error' });
             return;
         }
