@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
-// Import your local firebase config, which you created in `src/firebase/config.js`
-import { db, auth } from '../firebase/config'; 
+import { db, auth } from '../firebase/config';
 import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp } from 'firebase/firestore';
 
-// Get the App ID from environment variables
+// Import Components
+import Header from './Header';
+import UploadForm from './UploadForm';
+import Message from './Message';
+import PlayerTable from './PlayerTable';
+
 const appId = process.env.REACT_APP_ARTIFACT_ID || 'lords-mobile-stats-react-default';
 
 export default function App() {
@@ -15,6 +19,10 @@ export default function App() {
     const [userId, setUserId] = useState(null);
     const fileInputRef = useRef(null);
 
+    // ... (keep all your existing useEffect and handler functions here, no changes needed) ...
+    // ... (handleFileChange, toBase64, analyzeImageWithGemini, etc.) ...
+    
+    // (Your existing functions from the previous step go here)
     // Effect for Authentication
     useEffect(() => {
         if (!auth) {
@@ -88,7 +96,6 @@ export default function App() {
             }
         };
         
-        // NOTE: In a production app, this key should be handled by a backend server to keep it secret.
         const apiKey = ""; // The environment handles this key.
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
@@ -180,84 +187,28 @@ export default function App() {
             }
         }
     };
-    
+
+
     return (
-        <div className="bg-gray-900 text-gray-200 min-h-screen">
-            <div className="container mx-auto p-4 md:p-8">
-                <header className="text-center mb-8">
-                    <h1 className="text-4xl font-bold text-white mb-2">Lords Mobile Stats Tracker</h1>
-                    <p className="text-gray-400">Upload screenshots to track player might and kill progression.</p>
-                </header>
-
-                <main>
-                    <div className="bg-gray-800 rounded-lg shadow-lg p-6 mb-8 max-w-2xl mx-auto">
-                        <h2 className="text-2xl font-semibold mb-4 text-white">Upload Player Screenshot</h2>
-                        <div className="flex flex-col sm:flex-row items-center gap-4">
-                            <div className="relative flex-grow w-full">
-                                <input type="file" id="screenshotInput" className="hidden" accept="image/*" onChange={handleFileChange} ref={fileInputRef} />
-                                <label htmlFor="screenshotInput" className="cursor-pointer bg-gray-700 text-gray-300 rounded-md p-3 w-full text-center border-2 border-dashed border-gray-600 hover:bg-gray-600 hover:border-gray-500 transition-colors block">
-                                    {selectedFile ? `Selected: ${selectedFile.name.substring(0,25)}...` : 'Click to select a screenshot'}
-                                </label>
-                            </div>
-                            <button onClick={handleAnalyzeClick} className="bg-blue-600 text-white font-bold py-3 px-6 rounded-md hover:bg-blue-700 transition-all w-full sm:w-auto disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center justify-center h-[50px]" disabled={isLoading || !selectedFile}>
-                                {isLoading ? <div className="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-6 w-6"></div> : 'Analyze'}
-                            </button>
-                        </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+            <Header />
+            <main>
+                <Message message={message} />
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                    <div className="lg:col-span-1">
+                        <UploadForm
+                            selectedFile={selectedFile}
+                            handleFileChange={handleFileChange}
+                            handleAnalyzeClick={handleAnalyzeClick}
+                            isLoading={isLoading}
+                            fileInputRef={fileInputRef}
+                        />
                     </div>
-
-                    {message.text && (
-                        <div className={`max-w-2xl mx-auto text-center p-4 rounded-md mb-8 ${
-                            message.type === 'success' ? 'bg-green-500/20 text-green-300' :
-                            message.type === 'error' ? 'bg-red-500/20 text-red-300' :
-                            'bg-blue-500/20 text-blue-300'
-                        }`}>
-                            {message.text}
-                        </div>
-                    )}
-
-                    <div className="bg-gray-800 rounded-lg shadow-lg p-6 overflow-x-auto">
-                        <h2 className="text-2xl font-semibold mb-4 text-white">Player Stats</h2>
-                        <table className="min-w-full text-left whitespace-nowrap">
-                            <thead className="bg-gray-700 text-gray-300 uppercase text-sm">
-                                <tr>
-                                    <th className="p-4 rounded-l-lg">Player Name</th>
-                                    <th className="p-4">Initial Might</th>
-                                    <th className="p-4">Initial Kills</th>
-                                    <th className="p-4">Current Might</th>
-                                    <th className="p-4">Current Kills</th>
-                                    <th className="p-4">Might Gain</th>
-                                    <th className="p-4">Kills Gain</th>
-                                    <th className="p-4 rounded-r-lg">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-700">
-                                {players.length > 0 ? players.map(player => (
-                                    <tr key={player.id} className="bg-gray-800 hover:bg-gray-700/50 transition-colors">
-                                        <td className="p-4 font-medium text-white">{player.playerName}</td>
-                                        <td className="p-4">{player.initialMight.toLocaleString()}</td>
-                                        <td className="p-4">{player.initialKills.toLocaleString()}</td>
-                                        <td className="p-4">{player.currentMight.toLocaleString()}</td>
-                                        <td className="p-4">{player.currentKills.toLocaleString()}</td>
-                                        <td className="p-4 text-green-400 font-semibold">+{player.mightGain.toLocaleString()}</td>
-                                        <td className="p-4 text-green-400 font-semibold">+{player.killsGain.toLocaleString()}</td>
-                                        <td className="p-4">
-                                            <button onClick={() => handleDeletePlayer(player.id)} className="bg-red-600 text-white text-xs font-bold py-2 px-3 rounded hover:bg-red-700 transition-all">
-                                                DELETE
-                                            </button>
-                                        </td>
-                                    </tr>
-                                )) : (
-                                    <tr>
-                                        <td colSpan="8" className="text-center py-8 text-gray-500">
-                                            No player data yet. Upload a screenshot to get started!
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                    <div className="lg:col-span-2">
+                         <PlayerTable players={players} handleDeletePlayer={handleDeletePlayer} />
                     </div>
-                </main>
-            </div>
+                </div>
+            </main>
         </div>
     );
 }

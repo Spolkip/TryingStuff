@@ -9,16 +9,6 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #111827; /* bg-gray-900 */
-}
-
-/* Loader Animation */
-.loader {
-    border-top-color: #3498db;
-    animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+  background-color: #0d1117; /* Dark charcoal background */
+  color: #c9d1d9; /* Light text color */
 }
