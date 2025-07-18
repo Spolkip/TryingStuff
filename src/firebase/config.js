@@ -1,21 +1,46 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, signInAnonymously, signInWithCustomToken } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
-// Your web app's Firebase configuration
-// It's best practice to load these from environment variables
-const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID
+// --- Firebase Initialization ---
+
+// This function will initialize Firebase and handle authentication.
+// It returns a promise that resolves with the auth and db instances.
+const initializeFirebase = async () => {
+  let firebaseConfig = {};
+  try {
+    // __firebase_config is a global variable provided by the environment.
+    if (typeof __firebase_config !== 'undefined') {
+      firebaseConfig = JSON.parse(__firebase_config);
+    } else {
+      console.warn("Firebase config is not available.");
+      return { app: null, auth: null, db: null };
+    }
+  } catch (e) {
+    console.error("Failed to parse Firebase config:", e);
+    return { app: null, auth: null, db: null };
+  }
+
+  try {
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // Handle authentication
+    // __initial_auth_token is a global variable provided by the environment.
+    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+      await signInWithCustomToken(auth, __initial_auth_token);
+      console.log('Signed in with custom token.');
+    } else {
+      await signInAnonymously(auth);
+      console.log('Signed in anonymously.');
+    }
+
+    return { app, auth, db };
+  } catch (error) {
+    console.error("Firebase initialization or authentication failed:", error);
+    return { app: null, auth: null, db: null };
+  }
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-export { db, auth };
+export const firebaseInitializationPromise = initializeFirebase();

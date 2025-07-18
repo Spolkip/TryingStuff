@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { db, auth } from '../firebase/config';
-import { signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, collection, serverTimestamp } from 'firebase/firestore';
+import { firebaseInitializationPromise } from '../firebase/config';
 
 // Import Components
 import Header from './Header';
@@ -9,7 +9,8 @@ import UploadForm from './UploadForm';
 import Message from './Message';
 import PlayerTable from './PlayerTable';
 
-const appId = process.env.REACT_APP_ARTIFACT_ID || 'lords-mobile-stats-react-default';
+// The app ID is provided by the environment.
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'lords-mobile-stats-react-default';
 
 export default function App() {
     const [players, setPlayers] = useState([]);
@@ -17,37 +18,40 @@ export default function App() {
     const [isLoading, setIsLoading] = useState(false);
     const [message, setMessage] = useState({ text: '', type: '' });
     const [userId, setUserId] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
     const fileInputRef = useRef(null);
 
-    // ... (keep all your existing useEffect and handler functions here, no changes needed) ...
-    // ... (handleFileChange, toBase64, analyzeImageWithGemini, etc.) ...
-    
-    // (Your existing functions from the previous step go here)
-    // Effect for Authentication
+    // State for Firebase services
+    const [firebaseServices, setFirebaseServices] = useState({ auth: null, db: null });
+
+    // Effect for Firebase Initialization and Authentication
     useEffect(() => {
-        if (!auth) {
-            setMessage({ text: "Could not connect to the database. Check Firebase config.", type: 'error' });
-            return;
-        }
-        const unsubscribe = onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                setUserId(user.uid);
-                console.log("User is signed in with UID:", user.uid);
+        firebaseInitializationPromise.then(({ auth, db }) => {
+            if (auth && db) {
+                setFirebaseServices({ auth, db });
+                const unsubscribe = onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        setUserId(user.uid);
+                        console.log("User is signed in with UID:", user.uid);
+                    } else {
+                        setUserId(null);
+                        console.log("User is signed out.");
+                    }
+                    setIsAuthReady(true);
+                });
+                return () => unsubscribe();
             } else {
-                try {
-                    await signInAnonymously(auth);
-                } catch (error) {
-                    console.error("Anonymous sign-in failed:", error);
-                    setMessage({ text: "Authentication failed. Unable to save data.", type: 'error' });
-                }
+                 setMessage({ text: "Firebase could not be initialized.", type: 'error' });
+                 setIsAuthReady(true); // Allow UI to render with an error state
             }
         });
-        return () => unsubscribe();
     }, []);
+
 
     // Effect for Firestore Real-time Updates
     useEffect(() => {
-        if (!userId || !db) return;
+        const { db } = firebaseServices;
+        if (!isAuthReady || !userId || !db) return;
 
         const playersCollectionRef = collection(db, `artifacts/${appId}/public/data/players`);
         const unsubscribe = onSnapshot(playersCollectionRef, (snapshot) => {
@@ -59,8 +63,8 @@ export default function App() {
         });
 
         return () => unsubscribe();
-    }, [userId]);
-    
+    }, [isAuthReady, userId, firebaseServices]);
+
     // Effect to clear messages after a delay
     useEffect(() => {
         if (message.text) {
@@ -86,7 +90,7 @@ export default function App() {
 
     const analyzeImageWithGemini = async (base64ImageData) => {
         setMessage({ text: 'Analyzing image with AI... this may take a moment.', type: 'info' });
-        
+
         const prompt = `From the provided Lords Mobile game screenshot, extract the player's name, total might, and kills. Return the data as a JSON object with keys: "name" (string), "might" (number), and "kills" (number). Do not include commas in the numbers.`;
         const payload = {
             contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: base64ImageData } }] }],
@@ -95,28 +99,33 @@ export default function App() {
                 responseSchema: { type: "OBJECT", properties: { "name": { "type": "STRING" }, "might": { "type": "NUMBER" }, "kills": { "type": "NUMBER" } }, required: ["name", "might", "kills"] }
             }
         };
-        
+
         const apiKey = ""; // The environment handles this key.
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
         const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 
         if (!response.ok) throw new Error(`AI analysis failed with status: ${response.status}.`);
-        
+
         const result = await response.json();
         if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
             return JSON.parse(result.candidates[0].content.parts[0].text);
         } else {
+            console.error("Unexpected Gemini API response:", result);
             throw new Error("Failed to get a valid response from the AI model.");
         }
     };
 
     const processAndSavePlayerData = async (data) => {
-        if (!db) return;
+        const { db } = firebaseServices;
+        if (!db) {
+             setMessage({ text: 'Database not connected.', type: 'error' });
+             return;
+        }
         const playersCol = collection(db, `artifacts/${appId}/public/data/players`);
         const playerId = data.name.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
         if (!playerId) throw new Error("Player name from image is invalid.");
-        
+
         const playerDocRef = doc(playersCol, playerId);
         const playerDoc = await getDoc(playerDocRef);
 
@@ -145,11 +154,16 @@ export default function App() {
     };
 
     const handleAnalyzeClick = async () => {
+        const { auth } = firebaseServices;
         if (!selectedFile) {
             setMessage({ text: 'Please select a screenshot file first.', type: 'error' });
             return;
         }
-        if (!auth.currentUser) {
+        if (!isAuthReady) {
+            setMessage({ text: 'Authentication is not ready yet. Please wait.', type: 'error' });
+            return;
+        }
+        if (!auth || !auth.currentUser) {
             setMessage({ text: 'Cannot analyze: User not authenticated.', type: 'error' });
             return;
         }
@@ -176,7 +190,10 @@ export default function App() {
     };
 
     const handleDeletePlayer = async (playerId) => {
-        if (window.confirm(`Are you sure you want to delete all data for this player?`)) {
+        const { db } = firebaseServices;
+        // Using a custom modal/confirm would be better, but window.confirm is used for simplicity here.
+        const confirmDelete = window.confirm(`Are you sure you want to delete all data for this player?`);
+        if (confirmDelete) {
             try {
                 const playerDocRef = doc(db, `artifacts/${appId}/public/data/players`, playerId);
                 await deleteDoc(playerDocRef);
