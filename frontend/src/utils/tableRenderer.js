@@ -16,16 +16,63 @@ export const renderTable = (data, title, isMainPlayersTable = false,
                 Object.keys(item.huntingStats).forEach(key => allKeys.add(`Hunting: ${key}`));
             }
         });
-        headers = Array.from(allKeys).filter(key => key !== 'huntingStats' && key !== 'id');
-        const preferredOrder = ['ID', 'Name', 'might', 'Kills', 'Might Gained', 'Kills Gained', 'GF Pass/Fail', 'Rank', 'T4/T5', 'Sigils', 'Mana', 'Discord Name', 'Notes', 'lastUpdated', 'snapshotTime'];
-        headers.sort((a, b) => {
-            const indexA = preferredOrder.indexOf(a);
-            const indexB = preferredOrder.indexOf(b);
-            if (indexA === -1 && indexB === -1) return a.localeCompare(b);
-            if (indexA === -1) return 1;
-            if (indexB === -1) return -1;
-            return indexA - indexB;
+        // Remove 'id' as it's often the same as 'ID' and redundant in display
+        headers = Array.from(allKeys).filter(key => key !== 'id');
+
+        // Define a preferred order for all potential headers.
+        // This ensures consistent column order, with a fallback for new/unknown keys.
+        const preferredOrder = [
+            'ID',
+            'Name',
+            'might', // Ensure original 'might' is present
+            'Kills', // Ensure original 'Kills' is present
+            'Might Gained', // Explicitly include calculated fields
+            'Kills Gained', // Explicitly include calculated fields
+            'GF Pass/Fail',
+            'Rank',
+            'T4/T5',
+            'Sigils',
+            'Mana',
+            'Discord Name',
+            'Notes',
+            'lastUpdated',
+            'snapshotTime',
+            // Hunting Stats - these will be prefixed below
+            'Hunting: totalHunts',
+            'Hunting: huntCount',
+            'Hunting: purchaseCount',
+            'Hunting: l1Hunt',
+            'Hunting: l2Hunt',
+            'Hunting: l3Hunt',
+            'Hunting: l4Hunt',
+            'Hunting: l5Hunt',
+            'Hunting: l1Purchase',
+            'Hunting: l2Purchase',
+            'Hunting: l3Purchase',
+            'Hunting: l4Purchase',
+            'Hunting: l5Purchase',
+            'Hunting: pointsHunt',
+            'Hunting: goalPercentageHunt',
+            'Hunting: pointsPurchase',
+            'Hunting: goalPercentagePurchase',
+            'Hunting: firstHuntTime',
+            'Hunting: lastHuntTime',
+            'Hunting: huntingLastUpdated',
+        ];
+
+        // Filter and sort headers based on preferredOrder.
+        // Any headers not in preferredOrder will be appended alphabetically.
+        const sortedHeaders = preferredOrder.filter(header => {
+            // Check if the base key exists in data, or if it's a hunting stat
+            const baseKey = header.startsWith('Hunting: ') ? header.replace('Hunting: ', '') : header;
+            return data.some(item => item[baseKey] !== undefined || (item.huntingStats && item.huntingStats[baseKey] !== undefined));
         });
+
+        // Add any remaining headers that were not in preferredOrder, alphabetically
+        const remainingHeaders = headers.filter(header => !preferredOrder.includes(header));
+        remainingHeaders.sort((a, b) => a.localeCompare(b));
+
+        headers = [...sortedHeaders, ...remainingHeaders];
     }
 
     return (

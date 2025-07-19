@@ -45,12 +45,13 @@ export const processKillSheet = async (killSheetFile, currentDb, userId, current
                 const oldDoc = await getDoc(playerDocRef); // Fetch the existing player data.
                 const oldData = oldDoc.exists() ? oldDoc.data() : null; // Get old data if document exists.
 
-                let mightGained = 0;
-                let killsGained = 0;
-
                 const newMight = parseNumericFunc(newRow.might); // Parse new might value.
                 const newKills = parseNumericFunc(newRow.Kills); // Parse new kills value.
 
+                let mightGained = newMight; // Default if no old data
+                let killsGained = newKills; // Default if no old data
+
+                // Correctly assign might and kills increases based on old data
                 if (oldData) {
                     const oldMight = parseNumericFunc(oldData.might);
                     const oldKills = parseNumericFunc(oldData.Kills);
@@ -59,6 +60,7 @@ export const processKillSheet = async (killSheetFile, currentDb, userId, current
                     killsGained = newKills - oldKills; // Calculate kills gained.
 
                     // If there's a change in might, kills, or name, record history.
+                    // This now correctly checks for changes between old and new might/kills.
                     if (mightGained !== 0 || killsGained !== 0 || oldData.Name !== newRow.Name) {
                         // Reference to the player's history subcollection.
                         // Path: `artifacts/{appId}/users/{userId}/players/{playerID}/history`
@@ -66,13 +68,14 @@ export const processKillSheet = async (killSheetFile, currentDb, userId, current
                         // Add old data to history with a snapshot timestamp.
                         batch.set(doc(historyCollectionRef), {
                             ...oldData,
-                            snapshotTime: Timestamp.now()
+                            snapshotTime: Timestamp.now(),
+                            // Ensure these are explicitly recorded in history with old values
+                            might: oldData.might,
+                            Kills: oldData.Kills,
+                            'Might Gained': oldData['Might Gained'] || 0, // Store past calculated values
+                            'Kills Gained': oldData['Kills Gained'] || 0, // Store past calculated values
                         });
                     }
-                } else {
-                    // If no old data, might/kills gained are the current values.
-                    mightGained = newMight;
-                    killsGained = newKills;
                 }
 
                 // Prepare data to set/update in the player document.
@@ -81,13 +84,13 @@ export const processKillSheet = async (killSheetFile, currentDb, userId, current
                     ID: playerID, // Ensure ID is correctly set.
                     might: newMight,
                     Kills: newKills,
-                    'Might Gained': mightGained,
-                    'Kills Gained': killsGained,
+                    'Might Gained': mightGained, // Store calculated gained values
+                    'Kills Gained': killsGained, // Store calculated gained values
                     lastUpdated: Timestamp.now(), // Update timestamp.
                     Notes: oldData?.Notes || newRow.Notes || '', // Preserve old notes if not provided in new row.
                     // Include any old fields not present in the new CSV (except huntingStats).
                     ...(oldData && Object.fromEntries(
-                        Object.entries(oldData).filter(([key]) => !(key in newRow) && key !== 'huntingStats')
+                        Object.entries(oldData).filter(([key]) => !(key in newRow) && key !== 'huntingStats' && key !== 'Might Gained' && key !== 'Kills Gained')
                     )),
                     huntingStats: oldData?.huntingStats || {} // Preserve old hunting stats.
                 };
