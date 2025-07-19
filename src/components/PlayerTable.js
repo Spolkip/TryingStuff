@@ -1,64 +1,152 @@
 import React from 'react';
+import { History, Edit, Save, XCircle } from 'lucide-react';
+import { renderTable } from '../utils/tableRenderer'; // Reusing the rendering logic
 
-// SVG Icon for the delete button
-const DeleteIcon = () => (
-    <svg className="w-4 h-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-    </svg>
-);
+const PlayersTable = ({
+    data,
+    title,
+    fetchPlayerHistory,
+    editingNoteId,
+    setEditingNoteId,
+    noteInput,
+    setNoteInput,
+    saveNote
+}) => {
+    // Helper to render data in a table (moved from App.js)
+    const renderPlayersTableContent = (tableData) => {
+        if (!tableData || tableData.length === 0) return null;
 
-function PlayerTable({ players, handleDeletePlayer }) {
-  return (
-    <div className="bg-[#161b22] rounded-lg p-6 lg:p-8 border border-gray-700">
-      <h2 className="text-xl font-semibold mb-4 text-white">Player Stats</h2>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left whitespace-nowrap" style={{ borderCollapse: 'separate', borderSpacing: '0 0.75rem' }}>
-          <thead className="text-gray-400 uppercase text-xs">
-            <tr>
-              <th className="p-3">Player Name</th>
-              <th className="p-3">Initial Might</th>
-              <th className="p-3">Current Might</th>
-              <th className="p-3">Might Gain</th>
-              <th className="p-3">Initial Kills</th>
-              <th className="p-3">Current Kills</th>
-              <th className="p-3">Kills Gain</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.length > 0 ? (
-              players.sort((a, b) => b.mightGain - a.mightGain).map(player => (
-                <tr key={player.id} className="bg-gray-900/50 rounded-lg">
-                  <td className="p-4 font-medium text-white rounded-l-md">{player.playerName}</td>
-                  <td className="p-4 text-gray-300">{player.initialMight.toLocaleString()}</td>
-                  <td className="p-4 text-gray-300">{player.currentMight.toLocaleString()}</td>
-                  <td className="p-4 text-green-400 font-semibold">+{player.mightGain.toLocaleString()}</td>
-                  <td className="p-4 text-gray-300">{player.initialKills.toLocaleString()}</td>
-                  <td className="p-4 text-gray-300">{player.currentKills.toLocaleString()}</td>
-                  <td className="p-4 text-green-400 font-semibold">+{player.killsGain.toLocaleString()}</td>
-                  <td className="p-4 rounded-r-md">
-                    <button
-                      onClick={() => handleDeletePlayer(player.id)}
-                      className="bg-red-600/20 text-red-400 p-2 rounded-md hover:bg-red-600/40 hover:text-red-300 transition-all"
-                      aria-label={`Delete player ${player.playerName}`}
-                    >
-                        <DeleteIcon />
-                    </button>
-                  </td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="8" className="text-center py-12 text-gray-500">
-                  Upload a screenshot to get started!
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
+        let headers = [];
+        if (tableData.length > 0) {
+            const allKeys = new Set();
+            tableData.forEach(item => {
+                Object.keys(item).forEach(key => allKeys.add(key));
+                if (item.huntingStats) {
+                    Object.keys(item.huntingStats).forEach(key => allKeys.add(`Hunting: ${key}`));
+                }
+            });
+            headers = Array.from(allKeys).filter(key => key !== 'huntingStats' && key !== 'id');
+            const preferredOrder = ['ID', 'Name', 'might', 'Kills', 'Might Gained', 'Kills Gained', 'GF Pass/Fail', 'Rank', 'T4/T5', 'Sigils', 'Mana', 'Discord Name', 'Notes', 'lastUpdated'];
+            headers.sort((a, b) => {
+                const indexA = preferredOrder.indexOf(a);
+                const indexB = preferredOrder.indexOf(b);
+                if (indexA === -1 && indexB === -1) return a.localeCompare(b);
+                if (indexA === -1) return 1;
+                if (indexB === -1) return -1;
+                return indexA - indexB;
+            });
+        }
 
-export default PlayerTable;
+        return (
+            <div className="overflow-x-auto max-h-96">
+                <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0">
+                        <tr>
+                            {headers.map((header) => (
+                                <th
+                                    key={header}
+                                    scope="col"
+                                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+                                >
+                                    {header.replace(/([A-Z])/g, ' $1').replace(/^Hunting: /, 'Hunting ')}
+                                </th>
+                            ))}
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                        {tableData.map((row, rowIndex) => (
+                            <tr key={row.ID || row.id || rowIndex}>
+                                {headers.map((header, colIndex) => {
+                                    let displayValue = row[header];
+                                    if (header.startsWith('Hunting: ')) {
+                                        const originalKey = header.replace('Hunting: ', '');
+                                        displayValue = row.huntingStats ? row.huntingStats[originalKey] : '';
+                                    }
+
+                                    if (displayValue && typeof displayValue.toDate === 'function') {
+                                        displayValue = displayValue.toDate().toLocaleString();
+                                    }
+
+                                    if (header === 'Notes') {
+                                        return (
+                                            <td key={colIndex} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {editingNoteId === (row.ID || row.id) ? (
+                                                    <input
+                                                        type="text"
+                                                        value={noteInput}
+                                                        onChange={(e) => setNoteInput(e.target.value)}
+                                                        className="border rounded px-2 py-1 w-full"
+                                                    />
+                                                ) : (
+                                                    String(displayValue || '')
+                                                )}
+                                            </td>
+                                        );
+                                    }
+
+                                    return (
+                                        <td
+                                            key={colIndex}
+                                            className="px-6 py-4 whitespace-nowrap text-sm text-gray-900"
+                                        >
+                                            {String(displayValue || '')}
+                                        </td>
+                                    );
+                                })}
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                    <div className="flex space-x-2">
+                                        <button
+                                            onClick={() => fetchPlayerHistory(row.ID || row.id)}
+                                            className="text-indigo-600 hover:text-indigo-900"
+                                            title="View History"
+                                        >
+                                            <History size={18} />
+                                        </button>
+                                        {editingNoteId === (row.ID || row.id) ? (
+                                            <>
+                                                <button
+                                                    onClick={() => saveNote(row.ID || row.id)}
+                                                    className="text-green-600 hover:text-green-900"
+                                                    title="Save Note"
+                                                >
+                                                    <Save size={18} />
+                                                </button>
+                                                <button
+                                                    onClick={() => { setEditingNoteId(null); setNoteInput(''); }}
+                                                    className="text-red-600 hover:text-red-900"
+                                                    title="Cancel Edit"
+                                                >
+                                                    <XCircle size={18} />
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button
+                                                onClick={() => { setEditingNoteId(row.ID || row.id); setNoteInput(row.Notes || ''); }}
+                                                className="text-blue-600 hover:text-blue-900"
+                                                title="Edit Note"
+                                            >
+                                                <Edit size={18} />
+                                            </button>
+                                        )}
+                                    </div>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        );
+    };
+
+    return (
+        <div className="mb-8 p-4 bg-white rounded-lg shadow-md">
+            <h3 className="text-xl font-semibold mb-4 text-gray-800">{title}</h3>
+            {renderPlayersTableContent(data)}
+        </div>
+    );
+};
+
+export default PlayersTable;

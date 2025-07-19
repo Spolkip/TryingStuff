@@ -1,27 +1,28 @@
 {
+  "name": "lords-mobile-tracker",
+  "version": "1.0.0",
+  "description": "Guild tracker for Lords Mobile",
+  "main": "server.js",
+"scripts": {
+  "start": "node server.js",
+  "build": "react-scripts build",
+  "test": "react-scripts test",
+  "eject": "react-scripts eject"
+},
   "dependencies": {
-    "firebase": "^12.0.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-script": "^2.0.5",
-    "react-scripts": "^5.0.1"
+    "axios": "^1.10.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "firebase-admin": "^13.4.0",
+    "lucide-react": "^0.525.0",
+    "multer": "^2.0.2",
+    "papaparse": "^5.5.3",
+    "tailwindcss": "^4.1.11",
+    "xlsx": "^0.18.5"
   },
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
-    "eject": "react-scripts eject"
-  },
-  "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "nodemon": "^3.1.4"
   }
 }
