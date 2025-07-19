@@ -1,8 +1,37 @@
+// frontend/src/utils/data/dataProcessing.js
 import Papa from 'papaparse';
 import { collection, doc, Timestamp, writeBatch, getDoc } from 'firebase/firestore';
 
-// Helper function to safely parse numeric values from strings, handling commas and NaNs.
+// Helper function to get cell value, robust to key casing and trimming
+const getCellValue = (row, potentialKeys) => {
+    if (!row) return undefined;
+    for (const targetKey of potentialKeys) {
+        // Try exact key first
+        if (row[targetKey] !== undefined) {
+            return row[targetKey];
+        }
+        // Try trimmed key
+        const trimmedKey = targetKey.trim();
+        if (row[trimmedKey] !== undefined) {
+            return row[trimmedKey];
+        }
+        // Iterate through all actual keys in the row to find a case-insensitive, trimmed match
+        for (const actualKey in row) {
+            if (Object.prototype.hasOwnProperty.call(row, actualKey)) {
+                if (actualKey.trim().toLowerCase() === trimmedKey.toLowerCase()) {
+                    return row[actualKey];
+                }
+            }
+        }
+    }
+    return undefined;
+};
+
+// Helper function to safely parse numeric values from strings, handling commas, NaNs, and empty values.
 export const parseNumeric = (value) => {
+    if (value === null || value === undefined || value === '') {
+        return 0;
+    }
     if (typeof value === 'string') {
         const cleanedValue = value.replace(/,/g, '').trim();
         const parsed = parseFloat(cleanedValue);
@@ -32,7 +61,7 @@ export const processKillSheet = async (killSheetFile, currentDb, userId, current
 
             // Iterate over each row in the new kill sheet data.
             for (const newRow of newKillSheetData) {
-                const playerID = String(newRow.ID || '').trim();
+                const playerID = String(getCellValue(newRow, ['ID', 'id']) || '').trim();
                 // Skip rows with missing or invalid player IDs.
                 if (!playerID || !/^\d+$/.test(playerID)) {
                     console.warn("Skipping row due to missing or invalid ID:", newRow);
@@ -45,23 +74,23 @@ export const processKillSheet = async (killSheetFile, currentDb, userId, current
                 const oldDoc = await getDoc(playerDocRef); // Fetch the existing player data.
                 const oldData = oldDoc.exists() ? oldDoc.data() : null; // Get old data if document exists.
 
-                const newMight = parseNumericFunc(newRow.might); // Parse new might value.
-                const newKills = parseNumericFunc(newRow.Kills); // Parse new kills value.
+                const newMight = parseNumericFunc(getCellValue(newRow, ['might', 'Might'])); // Parse new might value.
+                const newKills = parseNumericFunc(getCellValue(newRow, ['Kills', 'kills'])); // Parse new kills value.
 
                 let mightGained = newMight; // Default if no old data
                 let killsGained = newKills; // Default if no old data
 
                 // Correctly assign might and kills increases based on old data
                 if (oldData) {
-                    const oldMight = parseNumericFunc(oldData.might);
-                    const oldKills = parseNumericFunc(oldData.Kills);
+                    const oldMight = parseNumericFunc(getCellValue(oldData, ['might', 'Might']));
+                    const oldKills = parseNumericFunc(getCellValue(oldData, ['Kills', 'kills']));
 
                     mightGained = newMight - oldMight; // Calculate might gained.
                     killsGained = newKills - oldKills; // Calculate kills gained.
 
                     // If there's a change in might, kills, or name, record history.
                     // This now correctly checks for changes between old and new might/kills.
-                    if (mightGained !== 0 || killsGained !== 0 || oldData.Name !== newRow.Name) {
+                    if (mightGained !== 0 || killsGained !== 0 || oldData.Name !== getCellValue(newRow, ['Name', 'name'])) {
                         // Reference to the player's history subcollection.
                         // Path: `artifacts/{appId}/users/{userId}/players/{playerID}/history`
                         const historyCollectionRef = collection(currentDb, `artifacts/${currentAppId}/users/${userId}/players/${playerID}/history`);
@@ -87,7 +116,8 @@ export const processKillSheet = async (killSheetFile, currentDb, userId, current
                     'Might Gained': mightGained, // Store calculated gained values
                     'Kills Gained': killsGained, // Store calculated gained values
                     lastUpdated: Timestamp.now(), // Update timestamp.
-                    Notes: oldData?.Notes || newRow.Notes || '', // Preserve old notes if not provided in new row.
+                    Notes: oldData?.Notes || getCellValue(newRow, ['Notes', 'notes']) || '', // Preserve old notes if not provided in new row.
+                    Name: getCellValue(newRow, ['Name', 'name']) || '', // Ensure Name is correctly set from newRow
                     // Include any old fields not present in the new CSV (except huntingStats).
                     ...(oldData && Object.fromEntries(
                         Object.entries(oldData).filter(([key]) => !(key in newRow) && key !== 'huntingStats' && key !== 'Might Gained' && key !== 'Kills Gained')
@@ -137,7 +167,7 @@ export const processHuntingSheet = async (huntingFile, currentDb, userId, curren
 
             // Iterate over each row in the new hunting data.
             for (const newRow of newHuntingData) {
-                const playerID = String(newRow['User ID'] || '').trim();
+                const playerID = String(getCellValue(newRow, ['User ID', 'User ID ', 'ID', 'id']) || '').trim(); // More robust ID fetching
                 // Skip rows with missing player IDs.
                 if (!playerID) {
                     console.warn("Skipping hunting row due to missing User ID:", newRow);
@@ -149,26 +179,26 @@ export const processHuntingSheet = async (huntingFile, currentDb, userId, curren
 
                 // Compile hunting statistics from the new row, parsing numeric values and dates.
                 const huntingStats = {
-                    totalHunts: parseNumericFunc(newRow.Total),
-                    huntCount: parseNumericFunc(newRow.Hunt),
-                    purchaseCount: parseNumericFunc(newRow.Purchase),
-                    l1Hunt: parseNumericFunc(newRow['L1 (Hunt)']),
-                    l2Hunt: parseNumericFunc(newRow['L2 (Hunt)']),
-                    l3Hunt: parseNumericFunc(newRow['L3 (Hunt)']),
-                    l4Hunt: parseNumericFunc(newRow['L4 (Hunt)']),
-                    l5Hunt: parseNumericFunc(newRow['L5 (Hunt)']),
-                    l1Purchase: parseNumericFunc(newRow['L1 (Purchase)']),
-                    l2Purchase: parseNumericFunc(newRow['L2 (Purchase)']),
-                    l3Purchase: parseNumericFunc(newRow['L3 (Purchase)']),
-                    l4Purchase: parseNumericFunc(newRow['L4 (Purchase)']),
-                    l5Purchase: parseNumericFunc(newRow['L5 (Purchase)']),
-                    pointsHunt: parseNumericFunc(newRow['Points (Hunt)']),
-                    goalPercentageHunt: parseNumericFunc(newRow['Goal Percentage (Hunt)']),
-                    pointsPurchase: parseNumericFunc(newRow['Points (Purchase)']),
-                    goalPercentagePurchase: parseNumericFunc(newRow['Goal Percentage (Purchase)']),
+                    totalHunts: parseNumericFunc(getCellValue(newRow, ['Total'])),
+                    huntCount: parseNumericFunc(getCellValue(newRow, ['Hunt'])),
+                    purchaseCount: parseNumericFunc(getCellValue(newRow, ['Purchase'])),
+                    l1Hunt: parseNumericFunc(getCellValue(newRow, ['L1 (Hunt)', 'L1 (Hunt) '])),
+                    l2Hunt: parseNumericFunc(getCellValue(newRow, ['L2 (Hunt)', 'L2 (Hunt) '])),
+                    l3Hunt: parseNumericFunc(getCellValue(newRow, ['L3 (Hunt)', 'L3 (Hunt) '])),
+                    l4Hunt: parseNumericFunc(getCellValue(newRow, ['L4 (Hunt)', 'L4 (Hunt) '])),
+                    l5Hunt: parseNumericFunc(getCellValue(newRow, ['L5 (Hunt)', 'L5 (Hunt) '])),
+                    l1Purchase: parseNumericFunc(getCellValue(newRow, ['L1 (Purchase)', 'L1 (Purchase) '])),
+                    l2Purchase: parseNumericFunc(getCellValue(newRow, ['L2 (Purchase)', 'L2 (Purchase) '])),
+                    l3Purchase: parseNumericFunc(getCellValue(newRow, ['L3 (Purchase)', 'L3 (Purchase) '])),
+                    l4Purchase: parseNumericFunc(getCellValue(newRow, ['L4 (Purchase)', 'L4 (Purchase) '])),
+                    l5Purchase: parseNumericFunc(getCellValue(newRow, ['L5 (Purchase)', 'L5 (Purchase) '])),
+                    pointsHunt: parseNumericFunc(getCellValue(newRow, ['Points (Hunt)', 'Points (Hunt) '])),
+                    goalPercentageHunt: parseNumericFunc(getCellValue(newRow, ['Goal Percentage (Hunt)', 'Goal Percentage (Hunt) '])),
+                    pointsPurchase: parseNumericFunc(getCellValue(newRow, ['Points (Purchase)', 'Points (Purchase) '])),
+                    goalPercentagePurchase: parseNumericFunc(getCellValue(newRow, ['Goal Percentage (Purchase)', 'Goal Percentage (Purchase) '])),
                     // Convert date strings to Firestore Timestamps, handling invalid date values.
-                    firstHuntTime: newRow['First Hunt Time'] && newRow['First Hunt Time'] !== '1899-12-31 00:00:00' ? Timestamp.fromDate(new Date(newRow['First Hunt Time'])) : null,
-                    lastHuntTime: newRow['Last Hunt Time'] && newRow['Last Hunt Time'] !== '1899-12-31 00:00:00' ? Timestamp.fromDate(new Date(newRow['Last Hunt Time'])) : null,
+                    firstHuntTime: getCellValue(newRow, ['First Hunt Time', 'First Hunt Time ']) && getCellValue(newRow, ['First Hunt Time', 'First Hunt Time ']) !== '1899-12-31 00:00:00' ? Timestamp.fromDate(new Date(getCellValue(newRow, ['First Hunt Time', 'First Hunt Time ']))) : null,
+                    lastHuntTime: getCellValue(newRow, ['Last Hunt Time', 'Last Hunt Time ']) && getCellValue(newRow, ['Last Hunt Time', 'Last Hunt Time ']) !== '1899-12-31 00:00:00' ? Timestamp.fromDate(new Date(getCellValue(newRow, ['Last Hunt Time', 'Last Hunt Time ']))) : null,
                     huntingLastUpdated: Timestamp.now() // Timestamp for when hunting data was last updated.
                 };
 
