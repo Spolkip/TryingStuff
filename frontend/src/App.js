@@ -12,7 +12,7 @@ import MessageDisplay from './components/MessageDisplay';
 
 // Global variable for the application ID provided by the Canvas environment.
 // For local development, this would typically be accessed via process.env.
-const appId = typeof __app_id !== 'undefined' ? __app_id : process.env.REACT_APP_APP_ID || 'default-app-id';
+const appId = process.env.REACT_APP_APP_ID || 'default-app-id';
 
 // Main App component
 const App = () => {

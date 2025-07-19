@@ -5,9 +5,9 @@ import { getFirestore } from 'firebase/firestore';
 
 // Global variables provided by the Canvas environment.
 // These are accessed directly as global variables if available, otherwise fall back to process.env for local development.
-const appId = typeof __app_id !== 'undefined' ? __app_id : process.env.REACT_APP_APP_ID || 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : (process.env.REACT_APP_FIREBASE_CONFIG ? JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG) : {});
-const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : process.env.REACT_APP_INITIAL_AUTH_TOKEN || null;
+const appId = process.env.REACT_APP_APP_ID || 'default-app-id';
+const firebaseConfig = process.env.REACT_APP_FIREBASE_CONFIG ? JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG) : {};
+const initialAuthToken = process.env.REACT_APP_INITIAL_AUTH_TOKEN || null;
 
 // Custom hook for Firebase initialization and authentication.
 export const useFirebase = () => {
