@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { User } from 'lucide-react';
-import { useFirebase, collection, query, onSnapshot, doc, Timestamp, getDocs, setDoc } from './utils/firebase'; // Ensure all necessary Firebase functions are imported from utils/firebase
+// Corrected imports: Ensure all necessary Firebase functions are explicitly imported
+import { useFirebase, collection, query, onSnapshot, doc, Timestamp, getDocs, setDoc } from './utils/firebase';
 import { processKillSheet, processHuntingSheet, parseNumeric } from './utils/dataProcessing';
 import { downloadJson, downloadXlsx } from './utils/fileDownloads';
-import FileUploadSection from './components/FileUploadSection';
+// Corrected component import paths
+import FileUploadSection from './components/FireUpload'; // Corrected from FileUploadSection to FireUpload
 import ActionButtons from './components/ActionButtons';
-import PlayersTable from './components/PlayersTable';
+import PlayersTable from './components/PlayerTable'; // Corrected from PlayersTable to PlayerTable
 import HistoryModal from './components/HistoryModal';
 import MessageDisplay from './components/MessageDisplay';
 
 // Global variables provided by the Canvas environment (re-declared here for clarity in App.js context)
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+// For local development, access environment variables via process.env
+const appId = process.env.REACT_APP_APP_ID || 'default-app-id';
 
 // Main App component
 const App = () => {
@@ -33,6 +36,7 @@ const App = () => {
     useEffect(() => {
         if (!db || !userId || !isAuthReady) return;
 
+        // Use the appId from process.env
         const playersColRef = collection(db, `artifacts/${appId}/users/${userId}/players`);
         const q = query(playersColRef);
 
@@ -49,7 +53,7 @@ const App = () => {
         });
 
         return () => unsubscribe(); // Cleanup snapshot listener
-    }, [db, userId, isAuthReady]); // Re-run if db, userId, or auth status changes
+    }, [db, userId, isAuthReady, appId]); // Added appId to dependency array
 
     // Function to handle CSV file upload
     const handleFileUpload = (event, type) => {
@@ -71,6 +75,7 @@ const App = () => {
         setLoading(true);
         setMessage(`Fetching history for ${playerID}...`);
         try {
+            // Use the appId from process.env
             const historyColRef = collection(db, `artifacts/${appId}/users/${userId}/players/${playerID}/history`);
             const q = query(historyColRef);
             const snapshot = await getDocs(q);
@@ -91,7 +96,7 @@ const App = () => {
         } finally {
             setLoading(false);
         }
-    }, [db, userId]);
+    }, [db, userId, appId]); // Added appId to dependency array
 
     // Function to save player notes
     const saveNote = useCallback(async (playerID) => {
@@ -100,6 +105,7 @@ const App = () => {
         setLoading(true);
         setMessage(`Saving note for ${playerID}...`);
         try {
+            // Use the appId from process.env
             const playerDocRef = doc(db, `artifacts/${appId}/users/${userId}/players`, playerID);
             await setDoc(playerDocRef, { Notes: noteInput, lastUpdated: Timestamp.now() }, { merge: true });
             setMessage(`Note saved for ${playerID}.`);
@@ -111,7 +117,7 @@ const App = () => {
         } finally {
             setLoading(false);
         }
-    }, [db, userId, editingNoteId, noteInput]);
+    }, [db, userId, editingNoteId, noteInput, appId]); // Added appId to dependency array
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6 font-inter text-gray-800">

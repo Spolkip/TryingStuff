@@ -1,8 +1,11 @@
 import Papa from 'papaparse';
-import { collection, doc, Timestamp, writeBatch, getDoc } from './firebase'; // Import from local firebase utility
+// Corrected import: All Firestore functions should be imported directly from firebase/firestore
+import { collection, doc, Timestamp, writeBatch, getDoc } from 'firebase/firestore';
+import { db } from './firebase'; // Import the db instance from your firebase utility
 
 // Global variables provided by the Canvas environment
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+// For local development, access environment variables via process.env
+const appId = process.env.REACT_APP_APP_ID || 'default-app-id';
 
 export const parseNumeric = (value) => {
     if (typeof value === 'string') {
@@ -13,8 +16,8 @@ export const parseNumeric = (value) => {
     return typeof value === 'number' ? value : 0;
 };
 
-export const processKillSheet = async (killSheetFile, db, userId, appId, setMessage, setLoading, parseNumericFunc) => {
-    if (!killSheetFile || !db || !userId) {
+export const processKillSheet = async (killSheetFile, currentDb, userId, currentAppId, setMessage, setLoading, parseNumericFunc) => {
+    if (!killSheetFile || !currentDb || !userId) {
         setMessage("Please upload a Kill Sheet CSV and ensure Firebase is ready.");
         return;
     }
@@ -27,7 +30,7 @@ export const processKillSheet = async (killSheetFile, db, userId, appId, setMess
         skipEmptyLines: true,
         complete: async (results) => {
             const newKillSheetData = results.data;
-            const batch = writeBatch(db);
+            const batch = writeBatch(currentDb);
 
             for (const newRow of newKillSheetData) {
                 const playerID = String(newRow.ID || '').trim();
@@ -36,7 +39,7 @@ export const processKillSheet = async (killSheetFile, db, userId, appId, setMess
                     continue;
                 }
 
-                const playerDocRef = doc(db, `artifacts/${appId}/users/${userId}/players`, playerID);
+                const playerDocRef = doc(currentDb, `artifacts/${currentAppId}/users/${userId}/players`, playerID);
                 const oldDoc = await getDoc(playerDocRef);
                 const oldData = oldDoc.exists() ? oldDoc.data() : null;
 
@@ -54,7 +57,7 @@ export const processKillSheet = async (killSheetFile, db, userId, appId, setMess
                     killsGained = newKills - oldKills;
 
                     if (mightGained !== 0 || killsGained !== 0 || oldData.Name !== newRow.Name) {
-                        const historyCollectionRef = collection(db, `artifacts/${appId}/users/${userId}/players/${playerID}/history`);
+                        const historyCollectionRef = collection(currentDb, `artifacts/${currentAppId}/users/${userId}/players/${playerID}/history`);
                         batch.set(doc(historyCollectionRef), {
                             ...oldData,
                             snapshotTime: Timestamp.now()
@@ -71,7 +74,7 @@ export const processKillSheet = async (killSheetFile, db, userId, appId, setMess
                     might: newMight,
                     Kills: newKills,
                     'Might Gained': mightGained,
-                    'Kills Gained': killsGills,
+                    'Kills Gained': killsGained, // Corrected typo here
                     lastUpdated: Timestamp.now(),
                     Notes: oldData?.Notes || newRow.Notes || '',
                     ...(oldData && Object.fromEntries(
@@ -100,8 +103,8 @@ export const processKillSheet = async (killSheetFile, db, userId, appId, setMess
     });
 };
 
-export const processHuntingSheet = async (huntingFile, db, userId, appId, setMessage, setLoading, parseNumericFunc) => {
-    if (!huntingFile || !db || !userId) {
+export const processHuntingSheet = async (huntingFile, currentDb, userId, currentAppId, setMessage, setLoading, parseNumericFunc) => {
+    if (!huntingFile || !currentDb || !userId) {
         setMessage("Please upload a Hunting CSV and ensure Firebase is ready.");
         return;
     }
@@ -114,7 +117,7 @@ export const processHuntingSheet = async (huntingFile, db, userId, appId, setMes
         skipEmptyLines: true,
         complete: async (results) => {
             const newHuntingData = results.data;
-            const batch = writeBatch(db);
+            const batch = writeBatch(currentDb);
 
             for (const newRow of newHuntingData) {
                 const playerID = String(newRow['User ID'] || '').trim();
@@ -123,7 +126,7 @@ export const processHuntingSheet = async (huntingFile, db, userId, appId, setMes
                     continue;
                 }
 
-                const playerDocRef = doc(db, `artifacts/${appId}/users/${userId}/players`, playerID);
+                const playerDocRef = doc(currentDb, `artifacts/${currentAppId}/users/${userId}/players`, playerID);
 
                 const huntingStats = {
                     totalHunts: parseNumericFunc(newRow.Total),

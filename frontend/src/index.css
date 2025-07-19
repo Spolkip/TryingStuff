@@ -1,7 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Optional: Import Google Font */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-```javascript
+
+/* This JavaScript block was incorrectly placed in a CSS file. It should be removed. */
+/*
 // tailwind.config.js
 /** @type {import('tailwindcss').Config} */
+/*
 module.exports = {
   content: [
     "./public/**/*.html", // If you have public/index.html
@@ -16,3 +24,4 @@ module.exports = {
   },
   plugins: [],
 }
+*/
