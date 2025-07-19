@@ -64,7 +64,7 @@ const App = () => {
         // Cleanup function: unsubscribe from the real-time listener when the component unmounts
         // or when dependencies change.
         return () => unsubscribe();
-    }, [db, userId, isAuthReady, appId]); // Dependencies for this effect.
+    }, [db, userId, isAuthReady]); // Dependencies for this effect.
 
     // Handles the selection of a file for upload (either Kill Sheet or Hunting Sheet).
     const handleFileUpload = (event, type) => {
@@ -117,7 +117,7 @@ const App = () => {
         } finally {
             setLoading(false); // Reset loading state.
         }
-    }, [db, userId, appId]); // Dependencies for this memoized callback.
+    }, [db, userId, editingNoteId, noteInput]); // Dependencies for this memoized callback.
 
     // Saves a note for a specific player to Firestore.
     const saveNote = useCallback(async (playerID) => {

@@ -1,10 +1,6 @@
 import Papa from 'papaparse';
 import { collection, doc, Timestamp, writeBatch, getDoc } from 'firebase/firestore';
 
-// Global variable for the application ID provided by the Canvas environment.
-// For local development, this would typically be accessed via process.env.
-const appId = process.env.REACT_APP_APP_ID || 'default-app-id';
-
 // Helper function to safely parse numeric values from strings, handling commas and NaNs.
 export const parseNumeric = (value) => {
     if (typeof value === 'string') {

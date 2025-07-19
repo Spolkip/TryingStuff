@@ -5,7 +5,6 @@ import { getFirestore } from 'firebase/firestore';
 
 // Global variables provided by the Canvas environment.
 // These are accessed directly as global variables if available, otherwise fall back to process.env for local development.
-const appId = process.env.REACT_APP_APP_ID || 'default-app-id';
 const firebaseConfig = process.env.REACT_APP_FIREBASE_CONFIG ? JSON.parse(process.env.REACT_APP_FIREBASE_CONFIG) : {};
 const initialAuthToken = process.env.REACT_APP_INITIAL_AUTH_TOKEN || null;
 
